@@ -149,15 +149,21 @@ export type Database = {
         ];
       };
     };
-    Views: Record<never, never>;
+    Views: {
+      [_ in never]: never;
+    };
     Functions: {
       is_admin: {
-        Args: Record<never, never>;
+        Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
     };
-    Enums: Record<never, never>;
-    CompositeTypes: Record<never, never>;
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
 };
 
