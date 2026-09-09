@@ -9,12 +9,7 @@ import {
   listPublishedJobs,
   parsePage,
 } from "@/lib/jobs/queries";
-
-export const metadata: Metadata = {
-  title: "Browse jobs",
-  description:
-    "Search and filter current job openings by keyword, location, category and employment type.",
-};
+import { buildListingMetadata } from "@/lib/seo/metadata";
 
 export const revalidate = 60;
 
@@ -25,6 +20,32 @@ type SearchParams = {
   employmentType?: string;
   page?: string;
 };
+
+/**
+ * Filtered result pages are marked noindex,follow: keyword and location
+ * combinations generate effectively unlimited near-duplicate URLs, which would
+ * dilute the canonical list. Plain and paginated pages stay indexable, and the
+ * canonical always points at the clean URL for that page number.
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const page = parsePage(params.page);
+  const filtered = Boolean(
+    params.search || params.location || params.category || params.employmentType,
+  );
+
+  return buildListingMetadata({
+    title: page > 1 ? `Browse jobs — page ${page}` : "Browse jobs",
+    description:
+      "Search and filter current job openings by keyword, location, category and employment type.",
+    path: page > 1 ? `/jobs?page=${page}` : "/jobs",
+    noindex: filtered,
+  });
+}
 
 export default async function JobsPage({
   searchParams,

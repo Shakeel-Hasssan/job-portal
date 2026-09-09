@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -11,6 +12,7 @@ import {
   listPublishedJobs,
   parsePage,
 } from "@/lib/jobs/queries";
+import { buildListingMetadata } from "@/lib/seo/metadata";
 
 export const revalidate = 60;
 
@@ -20,6 +22,37 @@ type SearchParams = {
   employmentType?: string;
   page?: string;
 };
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<SearchParams>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const query = await searchParams;
+  const category = await getCategoryBySlug(slug);
+
+  if (!category) {
+    return { title: "Category not found", robots: { index: false, follow: true } };
+  }
+
+  const page = parsePage(query.page);
+  const filtered = Boolean(query.search || query.location || query.employmentType);
+
+  return buildListingMetadata({
+    title:
+      page > 1
+        ? `${category.name} jobs — page ${page}`
+        : `${category.name} jobs`,
+    description:
+      category.description ??
+      `Current ${category.name.toLowerCase()} job openings and how to apply.`,
+    path: page > 1 ? `/category/${slug}?page=${page}` : `/category/${slug}`,
+    noindex: filtered,
+  });
+}
 
 export default async function CategoryPage({
   params,

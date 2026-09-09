@@ -1,13 +1,35 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getPublishedJobBySlug } from "@/lib/jobs/queries";
+import { buildJobPostingSchema, serializeJsonLd } from "@/lib/seo/job-posting";
+import { buildJobMetadata } from "@/lib/seo/metadata";
 import { parseApplicationSteps } from "@/lib/types";
 import { formatDate, isoDate } from "@/lib/utils/format";
 import { externalUrlHost, safeExternalUrl } from "@/lib/utils/url";
 
 export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const job = await getPublishedJobBySlug(slug);
+
+  // An unpublished or missing job must not leak a title into the head.
+  if (!job) {
+    return {
+      title: "Job not found",
+      robots: { index: false, follow: true },
+    };
+  }
+
+  return buildJobMetadata(job);
+}
 
 /**
  * Renders multi-line plain text.
@@ -46,8 +68,16 @@ export default async function JobDetailPage({
   const applyUrl = safeExternalUrl(job.application_url);
   const applyHost = externalUrlHost(job.application_url);
 
+  const jsonLd = buildJobPostingSchema(job);
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
+      {/* Structured data is escaped before embedding - see serializeJsonLd. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+
       <nav aria-label="Breadcrumb" className="text-sm text-neutral-600">
         <ol className="flex flex-wrap items-center gap-1">
           <li>
