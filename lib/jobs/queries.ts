@@ -55,6 +55,54 @@ export function parsePage(value: string | undefined): number {
   return Math.min(parsed, 10_000);
 }
 
+/**
+ * PostgREST error for an offset past the end of the result set. It answers a
+ * beyond-the-last-page request with 416 rather than an empty list.
+ */
+const RANGE_NOT_SATISFIABLE = "PGRST103";
+
+/**
+ * Applies the shared public filters to a jobs query.
+ *
+ * Extracted so the listing query and the fallback count query cannot drift
+ * apart - if they did, an out-of-range page would report a total that does not
+ * match the filters actually in force.
+ */
+function applyJobFilters<T>(
+  query: T,
+  filters: JobFilters,
+): T {
+  // The Supabase builder is chainable but its generics differ per call, so the
+  // narrowing happens through this local alias rather than at every step.
+  let q = query as unknown as ReturnType<
+    ReturnType<Awaited<ReturnType<typeof createClient>>["from"]>["select"]
+  >;
+
+  const search = filters.search ? sanitizeSearchTerm(filters.search) : "";
+  if (search) {
+    q = q.or(
+      `title.ilike.%${search}%,company_name.ilike.%${search}%,location.ilike.%${search}%`,
+    );
+  }
+
+  const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
+  if (location) {
+    q = q.ilike("location", `%${location}%`);
+  }
+
+  const employmentType = filters.employmentType?.trim();
+  if (employmentType) {
+    q = q.eq("employment_type", employmentType);
+  }
+
+  const categorySlug = filters.category?.trim();
+  if (categorySlug) {
+    q = q.eq("category.slug", categorySlug);
+  }
+
+  return q as unknown as T;
+}
+
 export async function listPublishedJobs(
   filters: JobFilters = {},
 ): Promise<JobListResult> {
@@ -72,37 +120,30 @@ export async function listPublishedJobs(
     ? "*, category:categories!inner(id, name, slug)"
     : "*, category:categories(id, name, slug)";
 
-  let query = supabase
+  const baseQuery = supabase
     .from("jobs")
     .select(selection, { count: "exact" })
     .eq("status", "published");
 
-  const search = filters.search ? sanitizeSearchTerm(filters.search) : "";
-  if (search) {
-    query = query.or(
-      `title.ilike.%${search}%,company_name.ilike.%${search}%,location.ilike.%${search}%`,
-    );
-  }
-
-  const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
-  if (location) {
-    query = query.ilike("location", `%${location}%`);
-  }
-
-  const employmentType = filters.employmentType?.trim();
-  if (employmentType) {
-    query = query.eq("employment_type", employmentType);
-  }
-
-  if (categorySlug) {
-    query = query.eq("category.slug", categorySlug);
-  }
-
-  const { data, error, count } = await query
+  const { data, error, count } = await applyJobFilters(baseQuery, filters)
     .order("published_at", { ascending: false })
     .range(from, to);
 
   if (error) {
+    // A page number past the end is a normal request - a stale bookmark, a
+    // crawler, or a hand-edited URL - not a failure. Report an empty page with
+    // the true total so pagination can still link back to a valid page.
+    if (error.code === RANGE_NOT_SATISFIABLE) {
+      const total = await countPublishedJobs(filters);
+      return {
+        jobs: [],
+        total,
+        page,
+        pageCount: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
+        error: null,
+      };
+    }
+
     return { jobs: [], total: 0, page, pageCount: 0, error: error.message };
   }
 
@@ -115,6 +156,24 @@ export async function listPublishedJobs(
     pageCount: Math.max(1, Math.ceil(total / JOBS_PER_PAGE)),
     error: null,
   };
+}
+
+/** Counts matching published jobs without fetching any rows. */
+async function countPublishedJobs(filters: JobFilters): Promise<number> {
+  const supabase = await createClient();
+  const categorySlug = filters.category?.trim();
+
+  const selection = categorySlug
+    ? "id, category:categories!inner(id)"
+    : "id";
+
+  const baseQuery = supabase
+    .from("jobs")
+    .select(selection, { count: "exact", head: true })
+    .eq("status", "published");
+
+  const { count } = await applyJobFilters(baseQuery, filters);
+  return count ?? 0;
 }
 
 /** A single published job by slug, or null when it does not exist. */

@@ -13,6 +13,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./", import.meta.url)),
+      // `server-only` throws on import outside a server context, which would
+      // stop these tests loading modules that guard themselves with it.
+      "server-only": fileURLToPath(
+        new URL("./test/stubs/server-only.ts", import.meta.url),
+      ),
     },
   },
   // These tests import no CSS. Declaring an empty PostCSS config stops Vite
