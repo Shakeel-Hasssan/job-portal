@@ -24,8 +24,19 @@ export default async function AdminDashboardLayout({
 
   return (
     <div className="min-h-screen bg-neutral-50">
+      <a href="#admin-content" className="skip-link">
+        Skip to main content
+      </a>
+
       <AdminNav email={user.email ?? "Administrator"} />
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+
+      <main
+        id="admin-content"
+        tabIndex={-1}
+        className="mx-auto max-w-6xl px-4 py-8 focus:outline-none"
+      >
+        {children}
+      </main>
     </div>
   );
 }

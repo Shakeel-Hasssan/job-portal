@@ -1,6 +1,19 @@
 @import "tailwindcss";
 
+/*
+  This interface is intentionally light-only. Every surface (cards, tables,
+  form fields) is an explicit white or neutral-50, while most text colours are
+  set per element.
+
+  A prefers-color-scheme override used to flip the inherited body colour to
+  near-white, which left inputs - who inherit their text colour - rendering
+  white-on-white and effectively invisible for anyone with a dark OS theme.
+  Rather than half-invert the palette, the page declares itself light so form
+  controls and scrollbars are rendered consistently. A genuine dark theme would
+  mean auditing every surface, which is a deliberate future change.
+*/
 :root {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -12,15 +25,43 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Use the fonts that layout.tsx actually loads. */
+  font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+}
+
+/*
+  Skip link.
+
+  Written as plain CSS rather than Tailwind's sr-only/not-sr-only pair, because
+  not-sr-only resets padding to 0 and renders the focused link as a cramped
+  chip with its px-4 py-2 stripped.
+*/
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 50;
+  border-radius: 0.375rem;
+  background-color: #171717;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff;
+  transition: top 150ms ease-in-out;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link {
+    transition: none;
+  }
 }
