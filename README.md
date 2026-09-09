@@ -35,8 +35,8 @@ the employer's own application page.
 
 | Requirement | Version | Notes |
 | --- | --- | --- |
-| Node.js | **22 LTS — required to deploy** | Local development, tests and `npm run build` work on Node 20. **Wrangler 4 refuses to run on anything below Node 22**, so `npm run preview` and `npm run deploy` require it. `@supabase/supabase-js` also warns on Node 20. |
-| npm | 10+ | Ships with Node. |
+| Node.js | **22 or newer** (developed on 24 LTS) | **Wrangler 4 refuses to run below Node 22**, so `npm run preview` and `npm run deploy` require it. `@supabase/supabase-js` also warns below 22. Node 20 can still run the dev server, tests and `npm run build`, but cannot deploy. |
+| npm | 11+ recommended | Ships with Node. npm 10.5.x has a resolver bug (`Cannot read properties of null (reading 'edgesOut')`) that breaks some dependency upgrades. |
 | Git | any recent | For cloning and deployment. |
 | Supabase account | free tier is fine | Provides PostgreSQL, authentication and file storage. |
 | Cloudflare account | free tier is fine | Hosts the application on Workers. |
@@ -185,14 +185,15 @@ which compiles the Next.js server into a Worker. This is the current Workers
 path — **not** the older Cloudflare Pages `next-on-pages` flow, and no
 Vercel-specific APIs are used anywhere in the project.
 
-> **Node 22 is required from here on.** `npm run cf:build` succeeds on Node 20,
-> but Wrangler 4 exits immediately below Node 22 with
-> *"Wrangler requires at least Node.js v22.0.0"*, so `preview` and `deploy`
-> will not run until you upgrade.
+> **Node 22 or newer is required from here on.** `npm run cf:build` succeeds on
+> Node 20, but Wrangler 4 exits immediately below Node 22 with
+> *"Wrangler requires at least Node.js v22.0.0"*.
 
-> **Status:** the Workers build has been verified to complete and produce
-> `.open-next/worker.js`. The application has **not** been deployed, and the
-> steps below have not been executed end to end.
+> **Status:** the Workers build completes and produces `.open-next/worker.js`,
+> and `wrangler deploy --dry-run` validates the configuration and bindings
+> (44 assets, ~13 MB / 3 MB gzipped). The application has **not** been deployed
+> to Cloudflare, so the account-specific steps below — `wrangler login`, the
+> real deploy, and the domain attachment — have not been executed.
 
 > **A note on middleware:** the OpenNext build prints
 > *"Node.js middleware support is experimental in cloudflare"*. This project's
@@ -352,7 +353,7 @@ proxy.ts               Refreshes the Supabase session on every request
 
 ## Before going live
 
-- [ ] Upgrade to Node 22 LTS (required for Wrangler).
+- [ ] Confirm you are on Node 22+ (required for Wrangler).
 - [ ] Delete the demo rows inserted by `seed.sql`.
 - [ ] Set `NEXT_PUBLIC_SITE_URL` to the real domain and redeploy.
 - [ ] Replace the placeholder content on `/about` and `/contact`.
@@ -406,29 +407,30 @@ the value is read when the config loads.
 `NEXT_PUBLIC_SITE_URL` was not set at **build** time. Set it and rebuild;
 `NEXT_PUBLIC_*` values are inlined during the build, not read at runtime.
 
-**`npm install` warns `EBADENGINE ... required: node >= 22`**
-You are on Node 20. Development, tests and `npm run build` still work, but
-deployment does not — see the next entry.
-
 **`Wrangler requires at least Node.js v22.0.0. You are using v20.x`**
-Exactly what it says: Wrangler 4 will not run below Node 22. Upgrade to Node 22
-LTS (via [nvm](https://github.com/nvm-sh/nvm), [Volta](https://volta.sh/), or
-the installer) and re-run. `npm run cf:build` works on Node 20; only `preview`
-and `deploy` are blocked.
+Exactly what it says: Wrangler 4 will not run below Node 22. Install Node 22 or
+newer (24 LTS is what this project is developed against) and re-run.
+`npm run cf:build` works on Node 20; only `preview` and `deploy` are blocked.
 
 **`npm ERR! Cannot read properties of null (reading 'edgesOut')`**
-A resolver bug in older npm (seen on 10.5.2), not a problem with the project.
-Update npm with `npm install -g npm@latest`, then retry. If it persists, delete
-`node_modules` and `package-lock.json` and install again.
+A resolver bug in npm 10.5.x, not a problem with the project. It persists even
+after deleting `node_modules` and `package-lock.json`. The fix is a newer npm —
+Node 22/24 ships npm 11, which resolves it.
+
+**`npm warn allow-scripts ... packages have install scripts not yet covered`**
+npm 11 blocks postinstall scripts by default. The packages listed (`esbuild`,
+`workerd`, `unrs-resolver`) still work here, because their platform binaries
+ship in prebuilt per-platform packages rather than being downloaded by the
+script. If a local `preview` ever fails to start the Workers runtime, run
+`npm approve-scripts --allow-scripts-pending` and reinstall.
 
 **`npm audit` reports vulnerabilities**
-As of writing, all reported advisories are in **development** dependencies
-(Vitest, Vite/esbuild, and `sharp` pulled in by Wrangler's Miniflare). None of
-them ship in the deployed Worker, which contains only the built application.
-The one marked *critical* concerns the Vitest UI server, which this project
-never starts — `npm test` runs `vitest run`. Upgrading Vitest to v4 is the
-clean fix but currently trips the npm resolver bug above; do it after updating
-npm.
+At the time of writing there are 4 high advisories, all in **development**
+dependencies and all from the same root: `sharp` (libheif CVEs) pulled in by
+`miniflare`, which comes from `wrangler`. None of it ships in the deployed
+Worker, which contains only the built application. Do **not** run
+`npm audit fix --force` — it downgrades Wrangler and breaks the deployment
+path. The advisories clear when Cloudflare updates Miniflare's `sharp`.
 
 **ESLint crashes with `Converting circular structure to JSON`**
 An older `eslint.config.mjs` used `FlatCompat`. This project imports the flat
