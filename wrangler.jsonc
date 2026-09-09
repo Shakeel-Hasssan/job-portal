@@ -1,0 +1,46 @@
+/**
+ * Cloudflare Workers configuration.
+ *
+ * The app is built for Workers by @opennextjs/cloudflare, which compiles the
+ * Next.js server into `.open-next/worker.js` and emits the static assets into
+ * `.open-next/assets`. This is the current Workers deployment path - not the
+ * older Cloudflare Pages `@cloudflare/next-on-pages` flow.
+ *
+ * Deploy with `npm run deploy`. See README.md for the full procedure.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "job-portal",
+  "main": ".open-next/worker.js",
+
+  // Must be recent enough for the Node.js compatibility the adapter relies on.
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  /**
+   * Public, non-secret values only.
+   *
+   * NEXT_PUBLIC_* variables are inlined into the client bundle at BUILD time,
+   * so these must also be present in the build environment (a .env.local
+   * locally, or the build-time variables in a Workers Builds / CI setup).
+   * Setting them here alone is not enough for the browser bundle.
+   *
+   * NEXT_PUBLIC_SITE_URL must be the real public origin in production -
+   * canonical URLs, the sitemap and Open Graph tags are all built from it.
+   * Never put SUPABASE_SERVICE_ROLE_KEY here; use `wrangler secret put`.
+   */
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://example.com",
+    "NEXT_PUBLIC_SUPABASE_URL": "",
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
+  }
+}

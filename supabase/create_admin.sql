@@ -1,15 +1,20 @@
 -- =============================================================================
--- create_admin.sql - grant administrator access to an existing Supabase user.
+-- create_admin.sql - grant an existing Supabase Auth user administrator access.
 --
--- The admin_users table has no RLS write policy by design, so it can only be
--- changed from the SQL editor or with the service role. That is what stops an
--- ordinary signed-in user from promoting themselves.
+-- There is deliberately no public sign-up and no API route that writes to
+-- admin_users: that table has a SELECT policy but no insert, update or delete
+-- policy, so the allow-list can only be changed with database-level access.
+-- That is what prevents privilege escalation through the public API.
 --
--- STEP 1: create the person's account first.
---   Supabase dashboard -> Authentication -> Users -> "Add user"
---   Choose "Auto Confirm User" so they can sign in without email confirmation.
+-- HOW TO USE
 --
--- STEP 2: replace the email below and run this file.
+--   1. Create the user first: Supabase dashboard -> Authentication -> Users ->
+--      Add user. Tick "Auto Confirm User", or the account cannot sign in.
+--   2. Replace the email below with that user's email.
+--   3. Run this file in the SQL Editor.
+--
+-- The SELECT at the end prints one row on success. If it returns nothing, the
+-- email did not match any user in auth.users - check for a typo.
 -- =============================================================================
 
 insert into public.admin_users (user_id)
@@ -18,19 +23,19 @@ from auth.users
 where email = 'REPLACE_WITH_YOUR_EMAIL@example.com'
 on conflict (user_id) do nothing;
 
--- Verify the result: this should return exactly one row per administrator.
+-- Confirm the grant.
 select
-  au.id            as admin_users_id,
   u.email,
-  u.last_sign_in_at,
-  au.created_at    as granted_at
-from public.admin_users au
-join auth.users u on u.id = au.user_id
-order by au.created_at;
+  a.created_at as granted_at
+from public.admin_users a
+join auth.users u on u.id = a.user_id
+order by a.created_at;
 
 -- -----------------------------------------------------------------------------
--- To REVOKE administrator access (the auth account itself is left intact):
+-- To REVOKE administrator access (the account itself is left intact):
 --
 --   delete from public.admin_users
---   where user_id = (select id from auth.users where email = 'someone@example.com');
+--   where user_id = (
+--     select id from auth.users where email = 'REPLACE_WITH_YOUR_EMAIL@example.com'
+--   );
 -- -----------------------------------------------------------------------------
