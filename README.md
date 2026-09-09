@@ -203,18 +203,32 @@ Vercel-specific APIs are used anywhere in the project.
 > refresh, not access control. Test sign-in via `npm run preview` before relying
 > on a deployment.
 
-### 1. Configure `wrangler.jsonc`
+### 1. Set the production environment variables *for the build*
 
-Set the real values in the `vars` block:
+> **This is the single easiest thing to get wrong.** Next.js inlines
+> `NEXT_PUBLIC_*` values into the compiled output at **build** time. Putting
+> them in `wrangler.jsonc` has **no effect** — this was verified by setting
+> `NEXT_PUBLIC_SITE_URL` there to a different value and watching the built
+> pages still emit the build-time origin. Deploy with the wrong build
+> environment and you will publish canonical URLs, a sitemap and Open Graph
+> tags all pointing at `localhost:3000`.
 
-- `NEXT_PUBLIC_SITE_URL` — your production domain
-- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+Set these wherever the build runs:
 
-Because `NEXT_PUBLIC_*` values are inlined at build time, they must **also** be
-available to the build. Keep a `.env.local` (or the equivalent CI variables)
-with the production values when building for production.
+| Where you build | Where to set them |
+| --- | --- |
+| Locally, then `npm run deploy` | `.env.local` |
+| Cloudflare Workers Builds / CI | The build-time environment variables in that system |
 
-Change `name` if `job-portal` is already taken in your account.
+The values needed are `NEXT_PUBLIC_SITE_URL` (your real production origin),
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+
+After deploying, confirm it worked by checking that
+`https://your-domain.com/sitemap.xml` shows your domain and not `localhost`.
+
+In `wrangler.jsonc`, change `name` if `job-portal` is already taken in your
+account. Add a `vars` block only for genuine runtime values, and never for
+secrets — that file is committed.
 
 ### 2. Authenticate
 

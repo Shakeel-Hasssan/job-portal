@@ -27,20 +27,22 @@
   },
 
   /**
-   * Public, non-secret values only.
+   * There are deliberately no NEXT_PUBLIC_* entries here.
    *
-   * NEXT_PUBLIC_* variables are inlined into the client bundle at BUILD time,
-   * so these must also be present in the build environment (a .env.local
-   * locally, or the build-time variables in a Workers Builds / CI setup).
-   * Setting them here alone is not enough for the browser bundle.
+   * Next.js inlines NEXT_PUBLIC_* values into the compiled output at BUILD
+   * time; it does not read them from the Worker environment at runtime. Listing
+   * them here looks like configuration but has no effect - verified by setting
+   * NEXT_PUBLIC_SITE_URL to a different value here and observing the built
+   * pages still emit the origin that was present at build time. Keeping them
+   * would invite deploying with canonical URLs and a sitemap pointing at
+   * localhost.
    *
-   * NEXT_PUBLIC_SITE_URL must be the real public origin in production -
-   * canonical URLs, the sitemap and Open Graph tags are all built from it.
-   * Never put SUPABASE_SERVICE_ROLE_KEY here; use `wrangler secret put`.
+   * Set them where the BUILD runs instead:
+   *   - locally: .env.local
+   *   - Workers Builds / CI: the build-time environment variables
+   *
+   * Genuine runtime values may be added to a "vars" block here. Secrets never
+   * belong in this file - it is committed to git. Use:
+   *   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
    */
-  "vars": {
-    "NEXT_PUBLIC_SITE_URL": "https://example.com",
-    "NEXT_PUBLIC_SUPABASE_URL": "",
-    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
-  }
 }
